@@ -15,12 +15,29 @@ from __future__ import annotations
 import argparse
 import math
 import os
+from pathlib import Path
 import sys
 
 try:
     from PIL import Image, ImageDraw, ImageFont
 except ImportError:
     sys.exit("Pillow is required:  pip install Pillow")
+
+
+def load_label_font(size: int):
+    candidates = (
+        Path("C:/Windows/Fonts/SarasaGothicSC-Regular.ttf"),
+        Path("/Library/Fonts/SarasaGothicSC-Regular.ttf"),
+        Path("/usr/share/fonts/truetype/sarasa-gothic/SarasaGothicSC-Regular.ttf"),
+        Path("/usr/local/share/fonts/SarasaGothicSC-Regular.ttf"),
+    )
+    for path in candidates:
+        if path.is_file():
+            return ImageFont.truetype(str(path), size)
+    sys.exit(
+        "Sarasa Gothic SC (更纱黑体) is required for montage labels; "
+        "install SarasaGothicSC-Regular.ttf"
+    )
 
 
 def build_montage(paths, out, cols=0, pad=16, bg=(255, 255, 255), label=False):
@@ -39,10 +56,7 @@ def build_montage(paths, out, cols=0, pad=16, bg=(255, 255, 255), label=False):
     H = rows * (cell_h + lab_h) + (rows + 1) * pad
     sheet = Image.new("RGB", (W, H), bg)
     draw = ImageDraw.Draw(sheet)
-    try:
-        font = ImageFont.truetype("arial.ttf", 14)
-    except Exception:
-        font = ImageFont.load_default()
+    font = load_label_font(14) if label else None
 
     for i, (im, p) in enumerate(zip(imgs, paths)):
         r, c = divmod(i, cols)

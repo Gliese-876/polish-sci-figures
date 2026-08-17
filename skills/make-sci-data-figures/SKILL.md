@@ -135,7 +135,7 @@ Use the worked independent, paired, and multi-group examples in `references/stat
 
 ## Artwork rules
 
-- Use Arial by default, or replace the global font once when the verified target requires another family.
+- Use Sarasa Gothic SC (更纱黑体) by default, or replace the global font once when the verified target requires another family.
 - Do not place panel letters, serial numbers, per-panel titles, subtitles, or conclusions inside reusable artwork.
 - Use correct case, italics, symbols, units, subscripts, and superscripts.
 - Reserve a non-data annotation margin for compact statistical evidence; never print text over points, lines, intervals, or markers.

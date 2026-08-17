@@ -28,11 +28,11 @@ from scipy import stats
 
 FIGSIZE = (4.8, 3.6)
 DPI = 200
-DEFAULT_FONT = "Arial"
+DEFAULT_FONT = "Sarasa Gothic SC"
 RNG_SEED = 20260719
 
-# Some Windows Arial files contain optional metadata tables that fontTools does
-# not subset into PDF. The artwork remains valid; keep that harmless internals
+# Some OpenType fonts contain optional metadata tables that fontTools does not
+# subset into PDF. The artwork remains valid; keep that harmless internals
 # message out of the user-facing command log.
 logging.getLogger("fontTools.subset").setLevel(logging.ERROR)
 
@@ -94,9 +94,12 @@ def resolve_font(requested: str) -> tuple[str, str | None]:
     try:
         path = fm.findfont(requested, fallback_to_default=False)
         return requested, path
-    except ValueError:
-        fallback_path = fm.findfont("DejaVu Sans")
-        return "DejaVu Sans", fallback_path
+    except ValueError as exc:
+        raise ValueError(
+            f"Required font {requested!r} is not installed. Install it or "
+            "explicitly select the verified target family with --font; "
+            "silent font fallback is not permitted."
+        ) from exc
 
 
 def style(font: str) -> None:

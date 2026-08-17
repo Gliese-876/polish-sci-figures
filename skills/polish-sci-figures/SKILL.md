@@ -1,6 +1,6 @@
 ---
 name: polish-sci-figures
-description: Create, redraw, compare, arrange, audit, and package publication-grade scientific figures for manuscripts, posters, Word documents, PowerPoint slides, and public showcases. Use for SCI figures, 论文配图, 科研作图, 结果可视化, 组图, 重绘, figure polishing, aligned multipanel grids, whitespace control, title-free and serial-label-free panels, collision-free annotations, Arial or journal-specific font control, scientific typography and nomenclature, consistent canvas sizing, final-size typography, editable SVG/PDF/PNG, manuscript or presentation figure QA, and original-versus-redesign selection.
+description: Create, redraw, compare, arrange, audit, and package publication-grade scientific figures for manuscripts, posters, Word documents, PowerPoint slides, and public showcases. Use for SCI figures, 论文配图, 科研作图, 结果可视化, 组图, 重绘, figure polishing, aligned multipanel grids, whitespace control, title-free and serial-label-free panels, collision-free annotations, Sarasa Gothic SC (更纱黑体) or journal-specific font control, scientific typography and nomenclature, consistent canvas sizing, final-size typography, editable SVG/PDF/PNG, manuscript or presentation figure QA, and original-versus-redesign selection.
 ---
 
 # Polish Scientific Figures
@@ -91,15 +91,15 @@ See `references/canvas_profiles.md` for exact matplotlib and audit commands.
 
 ## Choose and enforce one font family
 
-- Default the complete figure series to Arial when the user, journal, or existing project does not specify another family.
-- Replace Arial globally with Times New Roman or another required family when an explicit user, journal, institutional, or deck specification requires it. Change the shared style/source configuration once; do not edit individual labels.
+- Default the complete figure series to `Sarasa Gothic SC` (更纱黑体) when the user, journal, or existing project does not specify another family. Use this proportional family, not the Mono, Term, Fixed, UI, or Slab variants.
+- Replace Sarasa Gothic SC globally with another required family only when an explicit user, journal, institutional, or deck specification requires it. Change the shared style/source configuration once; do not edit individual labels.
 - Apply the selected family to every visible text object, including axes, ticks, legends, colorbars, annotations, statistical symbols, and mathtext. Do not mix families or accept an unintended fallback.
 - Verify that the selected font is installed and contains or can correctly compose every required scientific glyph. After any font change, regenerate and rerun final-size clipping, collision, glyph, SVG-editability, and container checks because text metrics change.
 
 Set the family once in Matplotlib and switch only `FONT` when the verified target changes:
 
 ```python
-FONT = "Arial"  # e.g. "Times New Roman" for a journal that requires it
+FONT = "Sarasa Gothic SC"  # replace only for a verified target requirement
 plt.rcParams.update({
     "font.family": FONT,
     "mathtext.rm": FONT,
@@ -197,7 +197,7 @@ Do not deliver while any of these is true:
 - Necessary text is unreadable at final size, clipped, overlapping, fragmented into characters, or using an unintended fallback font.
 - Any text, marker, interval, data line, axis, legend, colorbar, panel letter, connector, scale bar, title, or caption overlaps or ambiguously touches another element.
 - Scientific notation has incorrect italics, case, capitalization, subscript, superscript, sign, spacing, acronym, gene/protein/species convention, or unit formatting.
-- Any visible text uses a family other than the declared Arial or target-specific font, including an unintended math or fallback font.
+- Any visible text uses a family other than the declared Sarasa Gothic SC or target-specific font, including an unintended math or fallback font.
 - Panels on one page use inconsistent spacing, line weights, palette semantics, statistical syntax, or visual density.
 - The artwork contains presentation prose or internal IDs, or essential statistical evidence was removed in the name of cleanliness.
 - A raster-only/partially editable file is called fully editable.

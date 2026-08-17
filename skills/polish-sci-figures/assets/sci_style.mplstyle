@@ -2,8 +2,8 @@
 # deck, final placement, or explicit user requirement.
 
 # --- Fonts -------------------------------------------------------------------
-font.family        : Arial
-font.sans-serif    : Arial
+font.family        : Sarasa Gothic SC
+font.sans-serif    : Sarasa Gothic SC
 font.size          : 9.5
 axes.titlesize     : 12
 axes.labelsize     : 10
@@ -12,10 +12,10 @@ ytick.labelsize    : 8.5
 legend.fontsize    : 9
 figure.titlesize   : 15
 mathtext.fontset   : custom
-mathtext.rm        : Arial
-mathtext.it        : Arial:italic
-mathtext.bf        : Arial:bold
-# Use mathtext only for semantic italic/subscript/superscript runs that Arial
+mathtext.rm        : Sarasa Gothic SC
+mathtext.it        : Sarasa Gothic SC:italic
+mathtext.bf        : Sarasa Gothic SC:bold
+# Use mathtext only for semantic italic/subscript/superscript runs that the font
 # cannot represent as plain Unicode. Keep ordinary phrases as plain live text.
 mathtext.default   : regular
 

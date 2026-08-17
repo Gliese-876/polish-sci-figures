@@ -22,11 +22,13 @@ pip install python-docx python-pptx
 | SVG physical-canvas audit | stdlib only | `scripts/check_svg_canvas.py` |
 
 Notes
-- **Fonts.** matplotlib silently falls back when a named font is missing, which
-  is a common source of inconsistent figures. Confirm the intended family is
-  installed (`python -c "from matplotlib import font_manager as fm; print([f.name for f in fm.fontManager.ttflist if 'Arial' in f.name or 'Helvetica' in f.name])"`).
-  If Arial/Helvetica are absent, install them or fall back deliberately to
-  `Nimbus Sans`/`DejaVu Sans` and say so — do not let the fallback happen silently.
+- **Fonts.** Install the proportional `Sarasa Gothic SC` family (更纱黑体),
+  including regular, bold, italic, and bold italic faces. Do not substitute the
+  Mono, Term, Fixed, UI, or Slab variants. Confirm Matplotlib resolves it with
+  `python -c "from matplotlib import font_manager as fm; print(fm.findfont('Sarasa Gothic SC', fallback_to_default=False))"`.
+  If the verified target requires another family, declare that override once.
+  Never allow a silent fallback. Keep SVG recipients informed of the required
+  live-text font; verify that PDF export embeds the intended family.
 - **LibreOffice** is only needed to render Word/PowerPoint pages. If it is not
   installed, export the document to PDF manually and pass the PDF instead.
 - **PDF renderer.** `render_doc_pages.py` prefers PyMuPDF and automatically

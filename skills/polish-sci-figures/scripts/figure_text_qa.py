@@ -20,6 +20,7 @@ MISSING_GLYPH = re.compile(
     r"Glyph\s+\d+.*?missing from (?:current )?font(?:\(s\))?",
     re.IGNORECASE,
 )
+DEFAULT_FONT_FAMILY = "Sarasa Gothic SC"
 
 
 def audit_figure_text(
@@ -29,7 +30,7 @@ def audit_figure_text(
     allow_panel_labels: bool = False,
     allow_panel_titles: bool = False,
     require_aligned_grid: bool = True,
-    required_font_family: str | None = None,
+    required_font_family: str | None = DEFAULT_FONT_FAMILY,
 ) -> list[str]:
     """Return title and notation failures found in a Matplotlib figure."""
     issues: list[str] = []
@@ -167,7 +168,7 @@ def assert_figure_text_qa(
     allow_panel_labels: bool = False,
     allow_panel_titles: bool = False,
     require_aligned_grid: bool = True,
-    required_font_family: str | None = None,
+    required_font_family: str | None = DEFAULT_FONT_FAMILY,
 ) -> None:
     """Raise when a figure fails the title or typography release gate."""
     issues = audit_figure_text(

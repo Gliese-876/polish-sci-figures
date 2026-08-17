@@ -146,15 +146,18 @@ def apply_display(image: Image.Image, display_min, display_max, gamma: float, lu
 
 def find_font(size: int) -> tuple[ImageFont.ImageFont, str]:
     candidates = [
-        Path("C:/Windows/Fonts/arial.ttf"),
-        Path("/usr/share/fonts/truetype/msttcorefonts/Arial.ttf"),
-        Path("/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf"),
-        Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+        Path("C:/Windows/Fonts/SarasaGothicSC-Regular.ttf"),
+        Path("/Library/Fonts/SarasaGothicSC-Regular.ttf"),
+        Path("/usr/share/fonts/truetype/sarasa-gothic/SarasaGothicSC-Regular.ttf"),
+        Path("/usr/local/share/fonts/SarasaGothicSC-Regular.ttf"),
     ]
     for path in candidates:
         if path.is_file():
             return ImageFont.truetype(str(path), size=size), str(path)
-    return ImageFont.load_default(), "Pillow default bitmap font"
+    raise FileNotFoundError(
+        "Sarasa Gothic SC (更纱黑体) is required for image labels and scale bars. "
+        "Install SarasaGothicSC-Regular.ttf; silent fallback is not permitted."
+    )
 
 
 def contrast_color(image: Image.Image, box: tuple[int, int, int, int]) -> str:
@@ -237,7 +240,7 @@ def write_editable_panel_svg(display_image: Image.Image, output: Path,
         f'<image id="display-raster" x="0" y="0" width="{width}" height="{height}" '
         f'href="data:image/png;base64,{encoded}"/>',
         '</g>',
-        '<g id="editable-overlays" font-family="Arial, Helvetica, sans-serif">',
+        '<g id="editable-overlays" font-family="Sarasa Gothic SC">',
     ]
     if scale_bar:
         x0, y0, x1, y1 = scale_bar["scale_bar_box"]
