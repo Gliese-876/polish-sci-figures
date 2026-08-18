@@ -190,7 +190,7 @@ Each generated data-figure bundle contains fixed-canvas PNG/SVG/PDF candidates, 
 - No text–text, text–data, legend, scale-bar, axis, or annotation collisions at final size.
 - Equal physical canvas and axes geometry for panels intended for the same slot.
 - Correct case, italics, units, symbols, subscripts, superscripts, and journal font.
-- Parent and ordinary text renders at 5 pt or larger at final size; reduced mathematical scripts below 5 pt warn unless the target requires a strict glyph floor.
+- Every visible PDF text run renders at 5 pt or larger at final size, including reduced mathematical scripts.
 - Editable SVG/PDF plus high-resolution PNG; raster content is never mislabeled fully editable.
 
 ## Repository layout

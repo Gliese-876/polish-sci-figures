@@ -49,7 +49,7 @@ def finish(fig, axes, stem: str) -> None:
     fig.set_constrained_layout_pads(
         w_pad=0.28, h_pad=0.22, wspace=0.08, hspace=0.16,
     )
-    assert_figure_text_qa(fig, axes, required_font_family="Arial")
+    assert_figure_text_qa(fig, axes)
     for ext in ("png", "svg", "pdf"):
         path = OUT / f"{stem}.{ext}"
         fig.savefig(path, dpi=300 if ext == "png" else None)

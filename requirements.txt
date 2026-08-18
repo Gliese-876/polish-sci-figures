@@ -3,5 +3,5 @@ numpy
 openpyxl
 pandas
 Pillow
-PyMuPDF
+PyMuPDF>=1.24
 scipy

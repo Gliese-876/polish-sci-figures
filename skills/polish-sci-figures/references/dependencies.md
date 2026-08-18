@@ -42,8 +42,8 @@ Notes
   least one of them; some managed runtimes already provide `pdftoppm` on PATH.
 - **PDF text-size audit.** `audit_pdf_text.py` uses the publicly available
   PyMuPDF package to inspect effective text-span sizes, including reduced
-  MathText scripts. With `--min-pt 5`, ordinary runs below the floor fail and
-  reduced script-like runs warn; add `--strict-glyph-floor` only when a
-  verified target applies the floor to every rendered glyph.
+  MathText scripts. With `--min-pt 5`, every visible text run below the floor
+  fails; the PDF does not provide reliable semantics for automatically
+  exempting scripts.
 - Pin the same backend the project already uses; only default to
   Python/matplotlib when there is no existing plotting signal.

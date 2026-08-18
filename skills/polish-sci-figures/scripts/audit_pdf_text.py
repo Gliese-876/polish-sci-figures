@@ -10,7 +10,6 @@ import sys
 
 
 SIZE_EPSILON_PT = 1e-4
-SCRIPT_SCALE_MAX = 0.85
 
 
 def _span_text(chars: list[tuple]) -> tuple[str, bool]:
@@ -28,12 +27,7 @@ def _span_text(chars: list[tuple]) -> tuple[str, bool]:
     return "".join(text), has_visible_character
 
 
-def _public_run(run: dict[str, object]) -> dict[str, object]:
-    return {key: value for key, value in run.items() if not key.startswith("_")}
-
-
-def audit_pdf(data: bytes, minimum_pt: float = 5.0, *,
-              strict_glyph_floor: bool = False) -> dict[str, object]:
+def audit_pdf(data: bytes, minimum_pt: float = 5.0) -> dict[str, object]:
     """Return the rendered-text size audit for a PDF byte string."""
     if minimum_pt <= 0:
         raise ValueError("minimum_pt must be positive")
@@ -67,47 +61,21 @@ def audit_pdf(data: bytes, minimum_pt: float = 5.0, *,
                         "font": str(span.get("font", "<unknown>")),
                         "size_pt": size,
                         "text": text[:80],
-                        "_sequence": span.get("seqno"),
                     })
 
-    below_internal = [
+    below = [
         run for run in runs
         if float(run["size_pt"]) < minimum_pt - SIZE_EPSILON_PT
     ]
-    sequence_max: dict[tuple[int, object], float] = {}
-    for run in runs:
-        sequence = run["_sequence"]
-        if sequence is None:
-            continue
-        key = (int(run["page"]), sequence)
-        sequence_max[key] = max(
-            sequence_max.get(key, 0.0), float(run["size_pt"]),
-        )
-    script_internal = []
-    ordinary_internal = []
-    for run in below_internal:
-        sequence = run["_sequence"]
-        maximum = sequence_max.get((int(run["page"]), sequence), 0.0)
-        is_reduced_script = (
-            sequence is not None
-            and float(run["size_pt"]) <= maximum * SCRIPT_SCALE_MAX
-        )
-        (script_internal if is_reduced_script else ordinary_internal).append(run)
-
-    below = [_public_run(run) for run in below_internal]
-    ordinary = [_public_run(run) for run in ordinary_internal]
-    scripts = [_public_run(run) for run in script_internal]
-    blocking = ordinary + (scripts if strict_glyph_floor else [])
     auditable = bool(runs) and not warnings
     verdict = (
         "NOT AUDITABLE" if not auditable
-        else "FAIL" if blocking
-        else "WARN" if scripts else "PASS"
+        else "FAIL" if below
+        else "PASS"
     )
     return {
         "auditable": auditable,
         "verdict": verdict,
-        "strict_glyph_floor": strict_glyph_floor,
         "minimum_required_pt": minimum_pt,
         "comparison_tolerance_pt": SIZE_EPSILON_PT,
         "minimum_found_pt": min(
@@ -116,12 +84,6 @@ def audit_pdf(data: bytes, minimum_pt: float = 5.0, *,
         "text_run_count": len(runs),
         "below_minimum_count": len(below),
         "below_minimum": below,
-        "ordinary_below_minimum_count": len(ordinary),
-        "ordinary_below_minimum": ordinary,
-        "script_below_minimum_count": len(scripts),
-        "script_below_minimum": scripts,
-        "blocking_below_minimum_count": len(blocking),
-        "blocking_below_minimum": blocking,
         "warnings": warnings,
     }
 
@@ -132,10 +94,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--min-pt", type=float, default=5.0,
         help="minimum allowed effective text size in points",
-    )
-    parser.add_argument(
-        "--strict-glyph-floor", action="store_true",
-        help="treat reduced mathematical/script-like runs below the floor as errors",
     )
     parser.add_argument("--json", action="store_true")
     return parser
@@ -155,9 +113,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: not a PDF file: {args.pdf}", file=sys.stderr)
         return 2
     try:
-        result = audit_pdf(
-            data, args.min_pt, strict_glyph_floor=args.strict_glyph_floor,
-        )
+        result = audit_pdf(data, args.min_pt)
     except Exception as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -173,16 +129,9 @@ def main(argv: list[str] | None = None) -> int:
         if result["minimum_found_pt"] is not None:
             print(f"minimum found: {result['minimum_found_pt']:g} pt")
         print(f"verdict: {result['verdict']}")
-        for run in result["ordinary_below_minimum"]:
+        for run in result["below_minimum"]:
             print(
                 f"error: page {run['page']}: {run['size_pt']:g} pt, "
-                f"{run['font']}, {run['text']!r}"
-            )
-        script_level = "error" if args.strict_glyph_floor else "warning"
-        for run in result["script_below_minimum"]:
-            print(
-                f"{script_level}: page {run['page']}: {run['size_pt']:g} pt "
-                f"reduced mathematical/script-like run, "
                 f"{run['font']}, {run['text']!r}"
             )
         for warning in result["warnings"]:
@@ -191,7 +140,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if not result["auditable"]:
         return 2
-    return 1 if result["blocking_below_minimum_count"] else 0
+    return 1 if result["below_minimum_count"] else 0
 
 
 if __name__ == "__main__":

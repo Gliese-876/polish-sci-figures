@@ -236,31 +236,43 @@ def draw_scale_bar(image: Image.Image, um_per_pixel: float, bar_um: float,
     if label_bar:
         font, font_path, font_family = find_font(font_size, label)
         bounds = draw.textbbox((0, 0), label, font=font)
-        text_w = bounds[2] - bounds[0]
-        text_h = bounds[3] - bounds[1]
-        tx = (x0 + x1 - text_w) / 2
-        if tx + bounds[2] > out.width:
-            shift = int(math.ceil(tx + bounds[2] - out.width))
+        tx = (x0 + x1) / 2 - (bounds[0] + bounds[2]) / 2
+        if tx + bounds[2] > out.width - margin:
+            shift = int(math.ceil(tx + bounds[2] - (out.width - margin)))
             x0 -= shift
             x1 -= shift
-            tx = (x0 + x1 - text_w) / 2
-        if tx + bounds[0] < 0:
-            shift = int(math.ceil(-(tx + bounds[0])))
+            tx = (x0 + x1) / 2 - (bounds[0] + bounds[2]) / 2
+        if tx + bounds[0] < margin:
+            shift = int(math.ceil(margin - (tx + bounds[0])))
             x0 += shift
             x1 += shift
-        if x0 < margin or x1 > out.width - margin:
+            tx = (x0 + x1) / 2 - (bounds[0] + bounds[2]) / 2
+        ty = y0 - 7 - bounds[3]
+        label_box = [
+            tx + bounds[0], ty + bounds[1],
+            tx + bounds[2], ty + bounds[3],
+        ]
+        if (x0 < margin or x1 > out.width - margin
+                or label_box[0] < margin
+                or label_box[2] > out.width - margin
+                or label_box[1] < margin
+                or label_box[3] > y0 - 7):
             raise ValueError("The scale-bar label cannot fit at the 5 pt floor.")
-    sample_box = (max(0, x0 - 6), max(0, y0 - 28), min(out.width, x1 + 6), min(out.height, y1 + 6))
+        sample_box = (
+            max(0, int(math.floor(min(x0, label_box[0]) - 6))),
+            max(0, int(math.floor(min(y0, label_box[1]) - 6))),
+            min(out.width, int(math.ceil(max(x1, label_box[2]) + 6))),
+            min(out.height, int(math.ceil(max(y1, label_box[3]) + 6))),
+        )
+    else:
+        sample_box = (
+            max(0, x0 - 6), max(0, y0 - 6),
+            min(out.width, x1 + 6), min(out.height, y1 + 6),
+        )
     color = contrast_color(out, sample_box)
     draw.rectangle((x0, y0, x1, y1), fill=color)
     if label_bar:
-        tx = (x0 + x1 - text_w) / 2
-        ty = max(margin, y0 - text_h - 7)
-        if (tx + bounds[0] < 0 or tx + bounds[2] > out.width
-                or ty + bounds[3] > y0):
-            raise ValueError("The scale-bar label cannot fit at the 5 pt floor.")
         draw.text((tx, ty), label, font=font, fill=color)
-        label_box = [tx, ty, tx + text_w, ty + text_h]
     return out, {
         "scale_bar_um": float(bar_um), "scale_bar_pixels": int(length_px),
         "scale_bar_box": [x0, y0, x1, y1], "scale_bar_color": color,
