@@ -28,5 +28,5 @@ Every command must:
 4. export PNG, live-text SVG, and PDF without tight cropping;
 5. write input hashing/profile, analysis scope and limitations, and a deterministic recipe;
 6. permit palette-only rerendering without changing filtering, statistics, order, labels, geometry, or canvas;
-7. use Sarasa Gothic SC (更纱黑体) by default, no internal titles, no panel letters or serial numbers, and no text-data overlap;
+7. declare Sarasa Gothic SC (更纱黑体) first for default SC glyph forms and use only the documented fallback stack, with no internal titles, panel letters, serial numbers, or text-data overlap;
 8. pass final-size QA in `$polish-sci-figures` before publication.

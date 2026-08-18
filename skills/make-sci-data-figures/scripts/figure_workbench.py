@@ -28,13 +28,24 @@ from scipy import stats
 
 FIGSIZE = (4.8, 3.6)
 DPI = 200
-DEFAULT_FONT = "Sarasa Gothic SC"
+DEFAULT_FONT_STACK = (
+    "Sarasa Gothic SC",
+    "Noto Sans CJK SC",
+    "Microsoft YaHei",
+    "PingFang SC",
+    "DejaVu Sans",
+)
+DEFAULT_FONT = DEFAULT_FONT_STACK[0]
 RNG_SEED = 20260719
 
 # Some OpenType fonts contain optional metadata tables that fontTools does not
 # subset into PDF. The artwork remains valid; keep that harmless internals
 # message out of the user-facing command log.
 logging.getLogger("fontTools.subset").setLevel(logging.ERROR)
+# Font availability is preflighted explicitly by ``resolve_font``.  Silence the
+# font manager's repeated platform-specific misses while it walks the declared
+# cross-platform stack; real missing-glyph failures remain visible to QA.
+logging.getLogger("matplotlib.font_manager").setLevel(logging.ERROR)
 
 
 def read_table(path: Path, sheet: str | int = 0) -> pd.DataFrame:
@@ -90,30 +101,71 @@ def resolve_palette(name: str, colors: str | None, n: int) -> list[str]:
     return palette[:n]
 
 
-def resolve_font(requested: str) -> tuple[str, str | None]:
-    try:
-        path = fm.findfont(requested, fallback_to_default=False)
-        return requested, path
-    except ValueError as exc:
-        raise ValueError(
-            f"Required font {requested!r} is not installed. Install it or "
-            "explicitly select the verified target family with --font; "
-            "silent font fallback is not permitted."
-        ) from exc
+def font_stack(requested: str) -> tuple[str, ...]:
+    """Return a declared sans-serif stack with the requested family first."""
+    return tuple(dict.fromkeys((requested, *DEFAULT_FONT_STACK[1:])))
 
 
-def style(font: str) -> None:
+def resolve_font(requested: str) -> tuple[tuple[str, ...], str, str]:
+    stack = font_stack(requested)
+    for family in stack:
+        try:
+            path = fm.findfont(
+                fm.FontProperties(family=family), fallback_to_default=False,
+            )
+        except ValueError:
+            continue
+        return stack, family, path
+    raise ValueError(
+        "No declared publication sans-serif font is installed. Install "
+        f"one of: {', '.join(stack)}."
+    )
+
+
+def resolve_font_faces(family: str) -> tuple[dict[str, str], list[str]]:
+    """Resolve styled faces and disclose roles that reuse the regular file."""
+    specifications = {
+        "regular": ("normal", "normal"),
+        "bold": ("normal", "bold"),
+        "italic": ("italic", "normal"),
+        "bold_italic": ("italic", "bold"),
+    }
+    faces = {
+        role: fm.findfont(
+            fm.FontProperties(family=family, style=font_style, weight=weight),
+            fallback_to_default=False,
+        )
+        for role, (font_style, weight) in specifications.items()
+    }
+    regular = os.path.normcase(os.path.abspath(faces["regular"]))
+    reused_regular = [
+        role for role, path in faces.items()
+        if role != "regular"
+        and os.path.normcase(os.path.abspath(path)) == regular
+    ]
+    return faces, reused_regular
+
+
+def style(stack: tuple[str, ...], math_font: str) -> None:
     plt.rcParams.update({
-        "font.family": font,
+        # A concrete family list enables per-glyph fallback in current
+        # Matplotlib; a generic-only declaration may select one font for the
+        # whole text object and still emit missing-glyph warnings.
+        "font.family": list(stack),
+        "font.sans-serif": list(stack),
         "font.size": 10.5,
         "axes.labelsize": 12,
         "xtick.labelsize": 10.5,
         "ytick.labelsize": 10.5,
         "legend.fontsize": 10,
         "mathtext.fontset": "custom",
-        "mathtext.rm": font,
-        "mathtext.it": f"{font}:italic",
-        "mathtext.bf": f"{font}:bold",
+        "mathtext.rm": math_font,
+        "mathtext.it": f"{math_font}:italic",
+        "mathtext.bf": f"{math_font}:bold",
+        "mathtext.bfit": f"{math_font}:italic:bold",
+        "mathtext.sf": math_font,
+        "mathtext.default": "regular",
+        "mathtext.fallback": "stixsans",
         "axes.linewidth": 0.8,
         "xtick.major.width": 0.8,
         "ytick.major.width": 0.8,
@@ -683,12 +735,21 @@ def generate(input_path: Path, group: str, value: str, design: str, outdir: Path
         raise ValueError("--show-p-value requires --scope confirmatory and a pre-specified analysis family.")
     outdir.mkdir(parents=True, exist_ok=True)
     profile = profile_data(df, group, value, subject)
-    actual_font, font_path = resolve_font(font_requested)
+    declared_stack, actual_font, font_path = resolve_font(font_requested)
+    font_faces, reused_regular_roles = resolve_font_faces(actual_font)
     if actual_font != font_requested:
         profile["warnings"].append(
-            f"Requested font '{font_requested}' was unavailable; rendered with '{actual_font}'. Regenerate on a system with the target font before submission."
+            f"Requested font '{font_requested}' was unavailable; the declared "
+            f"fallback '{actual_font}' was used. Regenerate on a system with "
+            "the exact target font when the destination requires it."
         )
-    style(actual_font)
+    if reused_regular_roles:
+        profile["warnings"].append(
+            f"Font '{actual_font}' reuses its regular file for "
+            f"{', '.join(reused_regular_roles)}; the renderer may synthesize "
+            "those styles. Verify the destination permits synthetic faces."
+        )
+    style(declared_stack, actual_font)
     analysis, plotting_data = analyse(df, group, value, order, design, subject)
     analysis["experimental_unit_column"] = subject
     analysis["outcome_type"] = outcome_type
@@ -707,6 +768,10 @@ def generate(input_path: Path, group: str, value: str, design: str, outdir: Path
         "requested": font_requested,
         "actual": actual_font,
         "file": Path(font_path).name if font_path else None,
+        "faces": {role: Path(path).name for role, path in font_faces.items()},
+        "roles_reusing_regular": reused_regular_roles,
+        "fallback_stack": list(declared_stack),
+        "fallback_used": actual_font != font_requested,
     }
     analysis["source_file"] = input_path.name
     analysis["source_sha256"] = file_sha256(input_path)

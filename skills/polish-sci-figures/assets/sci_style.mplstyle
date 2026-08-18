@@ -2,8 +2,10 @@
 # deck, final placement, or explicit user requirement.
 
 # --- Fonts -------------------------------------------------------------------
-font.family        : Sarasa Gothic SC
-font.sans-serif    : Sarasa Gothic SC
+font.family        : Sarasa Gothic SC, Noto Sans CJK SC, Microsoft YaHei, PingFang SC, DejaVu Sans
+# Sarasa Gothic SC stays first so default Chinese glyph forms are SC. The
+# remaining entries are declared cross-platform fallbacks, not silent ones.
+font.sans-serif    : Sarasa Gothic SC, Noto Sans CJK SC, Microsoft YaHei, PingFang SC, DejaVu Sans
 font.size          : 9.5
 axes.titlesize     : 12
 axes.labelsize     : 10
@@ -12,9 +14,15 @@ ytick.labelsize    : 8.5
 legend.fontsize    : 9
 figure.titlesize   : 15
 mathtext.fontset   : custom
-mathtext.rm        : Sarasa Gothic SC
-mathtext.it        : Sarasa Gothic SC:italic
-mathtext.bf        : Sarasa Gothic SC:bold
+# Resolve math roles through the ordered sans-serif stack. This keeps Sarasa
+# Gothic SC primary but still lets the style load when only a declared
+# fallback family is installed.
+mathtext.rm        : sans
+mathtext.it        : sans:style=italic
+mathtext.bf        : sans:weight=bold
+mathtext.bfit      : sans:style=italic:weight=bold
+mathtext.sf        : sans
+mathtext.fallback  : stixsans
 # Use mathtext only for semantic italic/subscript/superscript runs that the font
 # cannot represent as plain Unicode. Keep ordinary phrases as plain live text.
 mathtext.default   : regular

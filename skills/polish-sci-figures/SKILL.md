@@ -1,6 +1,6 @@
 ---
 name: polish-sci-figures
-description: Create, redraw, compare, arrange, audit, and package publication-grade scientific figures for manuscripts, posters, Word documents, PowerPoint slides, and public showcases. Use for SCI figures, 论文配图, 科研作图, 结果可视化, 组图, 重绘, figure polishing, aligned multipanel grids, whitespace control, title-free and serial-label-free panels, collision-free annotations, Sarasa Gothic SC (更纱黑体) or journal-specific font control, scientific typography and nomenclature, consistent canvas sizing, final-size typography, editable SVG/PDF/PNG, manuscript or presentation figure QA, and original-versus-redesign selection.
+description: Create, redraw, compare, arrange, audit, and package publication-grade scientific figures for manuscripts, posters, Word documents, PowerPoint slides, and public showcases. Use for SCI figures, 论文配图, 科研作图, 结果可视化, 组图, 重绘, figure polishing, aligned multipanel grids, whitespace control, title-free and serial-label-free panels, collision-free annotations, Sarasa Gothic SC (更纱黑体) or journal-specific font control, scientific typography and nomenclature, a 5 pt ordinary/parent-text floor with script-aware PDF auditing, consistent canvas sizing, final-size typography, editable SVG/PDF/PNG, manuscript or presentation figure QA, and original-versus-redesign selection.
 ---
 
 # Polish Scientific Figures
@@ -15,7 +15,8 @@ Deliver the near-final figure in one internal pass: establish the claim and fina
 - Return the selected outputs from either companion skill to this skill for final canvas, typography, overlap, editability, and real-container QA.
 - Load `assets/sci_style.mplstyle` as a baseline; override it for a verified journal, deck, or user requirement.
 - Do not add panel letters or serial labels by default. Use `scripts/panel_labels.py` only when the user or verified target explicitly requires them, preferably at final composite assembly.
-- Use `scripts/figure_text_qa.py` as an authoring-time release gate before accepting Matplotlib exports; block delivery on grid-geometry drift, unrequested panel titles, collisions, or common baseline scientific notation. Run the skill copy from the agent/test harness, not by making the delivered plotting source search for or import the installed skill.
+- Use `scripts/figure_text_qa.py` as an authoring-time release gate before accepting Matplotlib exports; block delivery on grid-geometry drift, unrequested panel titles, collisions, parent text below 5 pt, or common baseline scientific notation. Run the skill copy from the agent/test harness, not by making the delivered plotting source search for or import the installed skill.
+- Run `scripts/audit_pdf_text.py figure.pdf --min-pt 5` on every final PDF. Ordinary runs below 5 pt fail; reduced mathematical/script-like runs below 5 pt warn for final-size review. Add `--strict-glyph-floor` only when a verified target requires every rendered glyph to meet the floor. A PDF with no supported auditable text runs is not a pass.
 - Run `scripts/check_source_portability.py` on every delivered plotting source. Treat skill/plugin runtime paths, home-directory support lookups, and machine-specific absolute private paths as release failures. Dynamic imports, `sys.path` mutation, and external processes are advisory unless the user or delivery contract explicitly requires a fully self-contained source; only then add `--strict`.
 - Use `scripts/make_montage.py` to compare a figure series.
 - Run `scripts/check_svg_canvas.py` on every independently editable SVG series intended for one grid or repeated slot.
@@ -41,7 +42,7 @@ Record or infer:
 1. The authoritative latest data, plotting source, and scientific claim.
 2. The final container: journal width, document position, poster region, or slide grid.
 3. Each panel's **slot class and exact final width × height**.
-4. Final-size font family and hierarchy, palette semantics, group order, label convention, background, and export formats.
+4. Final-size font family and hierarchy, a 5 pt floor for ordinary and parent text, the target's policy for reduced mathematical scripts, palette semantics, group order, label convention, background, and export formats.
 5. Whether a user-approved reference image or existing project visual system is the style target.
 
 Trace the file that is actually delivered or embedded; never polish an obsolete intermediate. Reuse plotting code plus data first, then native vector, then high-resolution raster. Preserve an approved visual system unless the user asks for a redesign.
@@ -85,28 +86,64 @@ This is a release blocker, not a finishing preference.
 - Create figures at that physical size and reserve margins inside the fixed canvas. Never use `bbox_inches="tight"` or automatic tight cropping for panels that will be assembled later; it silently creates different canvases.
 - Insert each asset at its declared physical size (100% scale). If the target slot changes, regenerate for the new slot instead of resizing the SVG in Word, PowerPoint, Illustrator, or layout software.
 - Use separate slot classes for equal, wide, or tall panels; keep each class internally identical and keep typography defined at its final physical size.
+- Keep every visible ordinary or parent text object at least 5 pt at the declared final size. Review reduced mathematical scripts reported by the PDF audit at final size; they are warnings by default, and become failures only under a verified all-glyph floor via `--strict-glyph-floor`.
 - Run `check_svg_canvas.py` separately for every slot class and block delivery on any mismatch.
 
 See `references/canvas_profiles.md` for exact matplotlib and audit commands.
 
-## Choose and enforce one font family
+## Choose and enforce one declared font stack
 
-- Default the complete figure series to `Sarasa Gothic SC` (更纱黑体) when the user, journal, or existing project does not specify another family. Use this proportional family, not the Mono, Term, Fixed, UI, or Slab variants.
-- Replace Sarasa Gothic SC globally with another required family only when an explicit user, journal, institutional, or deck specification requires it. Change the shared style/source configuration once; do not edit individual labels.
-- Apply the selected family to every visible text object, including axes, ticks, legends, colorbars, annotations, statistical symbols, and mathtext. Do not mix families or accept an unintended fallback.
-- Verify that the selected font is installed and contains or can correctly compose every required scientific glyph. After any font change, regenerate and rerun final-size clipping, collision, glyph, SVG-editability, and container checks because text metrics change.
+- Default the complete figure series to `Sarasa Gothic SC` (更纱黑体) when the user, journal, or existing project does not specify another family. Keep this proportional SC family first so its Simplified-Chinese glyph forms are used whenever available; do not substitute the Mono, Term, Fixed, UI, or Slab variants.
+- Keep the complete default text stack intentionally short: `Sarasa Gothic SC`, `Noto Sans CJK SC`, `Microsoft YaHei`, `PingFang SC`, then `DejaVu Sans`. These five levels cover the preferred SC design, an open CJK fallback, native Windows and macOS CJK families, and a broad scientific/Latin last resort without making font resolution opaque.
+- A fallback is acceptable only when the earlier families are unavailable or lack a required glyph and the used family is in the declared stack. Never accept an undeclared or silent fallback. If a journal, institution, or deck requires one exact family, make that family first, remove unapproved fallbacks, and treat any substitution as a release failure.
+- Apply the same declared stack to every visible text object, including axes, ticks, legends, colorbars, annotations, and statistical symbols. Keep mathtext on the first installed declared family and set Matplotlib's explicit `mathtext.fallback` to `stixsans` for missing mathematical glyphs; audit the concrete STIX face that the backend embeds.
+- Record the declared stack and inspect exported PDF/SVG font usage. Run `pdffonts figure.pdf` when Poppler is available and require every listed face to be embedded and subset; reject faces outside the declared text stack plus the explicit `stixsans` math fallback. For hand-written SVG, append generic `sans-serif` only as the final CSS tail after the concrete stack. Live-text SVG does not embed fonts, so ship the font prerequisites and use the embedded-font PDF as the appearance reference. After any font change or actual fallback, regenerate and rerun final-size clipping, collision, glyph, SVG-editability, and container checks because text metrics change.
 
-Set the family once in Matplotlib and switch only `FONT` when the verified target changes:
+Set the stack once in Matplotlib. Change only its first entry when a verified target requires another family:
 
 ```python
-FONT = "Sarasa Gothic SC"  # replace only for a verified target requirement
+import matplotlib.pyplot as plt
+from matplotlib import font_manager
+
+FONT_STACK = [
+    "Sarasa Gothic SC",  # primary: use SC glyph forms by default
+    "Noto Sans CJK SC", "Microsoft YaHei", "PingFang SC",
+    "DejaVu Sans",
+]
+def first_installed(stack):
+    for family in stack:
+        try:
+            font_manager.findfont(
+                font_manager.FontProperties(family=family),
+                fallback_to_default=False,
+            )
+        except ValueError:
+            continue
+        return family
+    raise RuntimeError("No declared publication sans-serif font is installed")
+
+MATH_FONT = first_installed(FONT_STACK)
 plt.rcParams.update({
-    "font.family": FONT,
-    "mathtext.rm": FONT,
-    "mathtext.it": f"{FONT}:italic",
-    "mathtext.bf": f"{FONT}:bold",
+    # Declare the concrete list directly: this enables per-glyph fallback in
+    # current Matplotlib, whereas a generic-only family may choose one font
+    # for the complete text object.
+    "font.family": FONT_STACK,
+    "font.sans-serif": FONT_STACK,
+    "mathtext.fontset": "custom",
+    "mathtext.rm": MATH_FONT,
+    "mathtext.it": f"{MATH_FONT}:italic",
+    "mathtext.bf": f"{MATH_FONT}:bold",
+    "mathtext.bfit": f"{MATH_FONT}:italic:bold",
+    "mathtext.sf": MATH_FONT,
+    "mathtext.default": "regular",
+    "mathtext.fallback": "stixsans",
+    "svg.fonttype": "none",
+    "pdf.fonttype": 42,
+    "ps.fonttype": 42,
 })
 ```
+
+Resolve and record the regular, bold, italic, and bold-italic file for `MATH_FONT`. If multiple roles resolve to the regular file, the backend may synthesize a face; disclose that result and treat it as a release failure whenever the verified target prohibits synthetic styling.
 
 ## Enforce scientific typography and nomenclature
 
@@ -115,6 +152,7 @@ Treat notation as scientific content, not decoration. Build a terminology and ca
 - Italicize only symbols that conventionally require it, such as *P*, *n*, *r*, *t*, *F*, and *z*. Keep their numbers, operators, punctuation, units, descriptive words, and surrounding sentences upright. Never italicize a whole annotation merely because it contains *P*.
 - Use true subscript and superscript characters where they remain live and editable: IC₅₀, EC₅₀, ED₅₀, LD₅₀, log₂, log₁₀, CO₂, cm², and 10⁻⁴. Do not deliver baseline forms such as `IC50`, `log2`, `CO2`, `cm^2`, or `10^-4` in figure text.
 - Confirm that the chosen font can render or semantically compose every required scientific glyph and treat any missing-glyph warning as a release failure. Never accept tofu boxes, blanks, or silent fallback.
+- Do not mix a plain-Unicode glyph that needs text-font fallback with a `$...$` run inside the same Matplotlib `Text` object: mathtext may parse the complete object and bypass ordinary per-glyph fallback. Split the objects or use the semantic math command, such as `r"$\hbar$"`, then rerun the missing-glyph gate.
 - Use proper mathematical signs and spacing: `×`, `−`, `±`, `≤`, and `≥`; put spaces around `=`, `<`, and `>` and between values and units, for example `AUC = 0.84`, `P < 0.001`, and `0.72 µM`. Do not use the letter `x` as a multiplication sign.
 - Use exact statistical values and the target journal's capitalization; default to italic capital *P*, not lowercase `p`. State the statistic or interval unambiguously, for example `HR (95% CI)` or `AUC (95% CI)`.
 - Italicize genus/species binomials, but keep strain designations and surrounding prose upright unless the field convention says otherwise.
@@ -182,7 +220,7 @@ For presentations, put the conclusion-style slide title, per-panel explanation, 
 2. Export SVG/PDF plus PNG; preserve the source code and data.
 3. Compare old and new at the same physical size and keep only the winning candidate.
 4. Open every final image and inspect a montage for cross-figure typography, canvas rhythm, palette, and margins.
-5. Run SVG editability and canvas audits; run the panel-label audit only when labels were explicitly required.
+5. Run SVG editability and canvas audits, then `scripts/audit_pdf_text.py figure.pdf --min-pt 5`; review script warnings and add `--strict-glyph-floor` only for a verified all-glyph requirement. Run the panel-label audit only when labels were explicitly required.
 6. Insert into the actual manuscript page or slide at 100% declared size and render that container. LibreOffice output is a compatibility preview, not native PowerPoint/Word rendering.
 7. Correct every failure and rerun the relevant checks before delivery.
 
@@ -194,10 +232,11 @@ Do not deliver while any of these is true:
 - A manuscript or showcase panel contains an unrequested title, subtitle, panel letter, sequence number, or serial label.
 - Same-slot SVGs differ in physical canvas or `viewBox`, or require post-hoc scaling to align.
 - Main axes in a regular grid have unequal widths, heights, outer edges, gutters, or avoidable asymmetric whitespace.
-- Necessary text is unreadable at final size, clipped, overlapping, fragmented into characters, or using an unintended fallback font.
+- Necessary text is unreadable at final size, clipped, overlapping, fragmented into characters, or using an undeclared fallback font.
+- Any ordinary or parent text is below 5 pt at the declared final size; a reduced-script warning remains unreadable or unresolved at final size; a verified all-glyph target has any run below 5 pt; or the PDF text-size audit is not auditable and no equivalent final-output evidence is recorded.
 - Any text, marker, interval, data line, axis, legend, colorbar, panel letter, connector, scale bar, title, or caption overlaps or ambiguously touches another element.
 - Scientific notation has incorrect italics, case, capitalization, subscript, superscript, sign, spacing, acronym, gene/protein/species convention, or unit formatting.
-- Any visible text uses a family other than the declared Sarasa Gothic SC or target-specific font, including an unintended math or fallback font.
+- The default stack does not declare Sarasa Gothic SC first, non-math text uses a family outside the declared stack, mathtext uses a face outside the selected math family plus the explicit `stixsans` fallback, or an exact target-specific font requirement falls back at all.
 - Panels on one page use inconsistent spacing, line weights, palette semantics, statistical syntax, or visual density.
 - The artwork contains presentation prose or internal IDs, or essential statistical evidence was removed in the name of cleanliness.
 - A raster-only/partially editable file is called fully editable.

@@ -21,5 +21,12 @@ The published width and height are the canvas contract. Apply them before
 drawing and follow `canvas_profiles.md`; never create a tightly cropped SVG and
 resize it later to imitate the required width.
 
+Use the stricter of the verified journal minimum and the plugin floor:
+ordinary and parent text must be at least 5 pt at the declared final size.
+Reduced mathematical scripts below 5 pt are warnings for final-size review
+unless the official rule explicitly covers every rendered glyph; in that case
+run `scripts/audit_pdf_text.py figure.pdf --min-pt 5 --strict-glyph-floor`.
+Repeat the audit if a downstream document scales the figure.
+
 For a public showcase, use the `showcase` rules in `SKILL.md`, not journal
 submission rules.

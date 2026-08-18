@@ -24,19 +24,59 @@ except ImportError:
     sys.exit("Pillow is required:  pip install Pillow")
 
 
-def load_label_font(size: int):
-    candidates = (
-        Path("C:/Windows/Fonts/SarasaGothicSC-Regular.ttf"),
-        Path("/Library/Fonts/SarasaGothicSC-Regular.ttf"),
-        Path("/usr/share/fonts/truetype/sarasa-gothic/SarasaGothicSC-Regular.ttf"),
-        Path("/usr/local/share/fonts/SarasaGothicSC-Regular.ttf"),
-    )
-    for path in candidates:
-        if path.is_file():
-            return ImageFont.truetype(str(path), size)
+LABEL_FONT_CANDIDATES = (
+    ("Sarasa Gothic SC", "C:/Windows/Fonts/SarasaGothicSC-Regular.ttf", 0),
+    ("Sarasa Gothic SC", "/Library/Fonts/SarasaGothicSC-Regular.ttf", 0),
+    ("Sarasa Gothic SC", "/usr/share/fonts/truetype/sarasa-gothic/SarasaGothicSC-Regular.ttf", 0),
+    ("Sarasa Gothic SC", "/usr/local/share/fonts/SarasaGothicSC-Regular.ttf", 0),
+    ("Noto Sans CJK SC", "C:/Windows/Fonts/NotoSansCJKsc-Regular.otf", 0),
+    ("Noto Sans CJK SC", "/Library/Fonts/NotoSansCJKsc-Regular.otf", 0),
+    ("Noto Sans CJK SC", "/usr/share/fonts/opentype/noto/NotoSansCJKsc-Regular.otf", 0),
+    ("Noto Sans CJK SC", "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", 2),
+    ("Microsoft YaHei", "C:/Windows/Fonts/msyh.ttc", 0),
+    ("PingFang SC", "/System/Library/Fonts/PingFang.ttc", 0),
+    ("DejaVu Sans", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 0),
+    ("DejaVu Sans", "DejaVuSans.ttf", 0),
+)
+
+
+def _glyph_signature(font, character: str) -> tuple:
+    mask = font.getmask(character, mode="L")
+    return mask.size, mask.getbbox(), bytes(mask)
+
+
+def _missing_codepoints(font, text: str) -> tuple[int, ...]:
+    missing_signature = _glyph_signature(font, "\U0010ffff")
+    return tuple(sorted({
+        ord(character)
+        for character in text
+        if not character.isspace()
+        and _glyph_signature(font, character) == missing_signature
+    }))
+
+
+def load_label_font(size: int, required_text: str = ""):
+    incomplete = []
+    for family, candidate, index in LABEL_FONT_CANDIDATES:
+        try:
+            font = ImageFont.truetype(candidate, size, index=index)
+        except OSError:
+            continue
+        missing = _missing_codepoints(font, required_text) if required_text else ()
+        if missing:
+            incomplete.append((family, missing))
+            continue
+        return font
+    if incomplete:
+        family, missing = incomplete[0]
+        codepoints = ", ".join(f"U+{value:04X}" for value in missing[:12])
+        sys.exit(
+            "No declared montage label font covers every required glyph. "
+            f"The first installed candidate, {family!r}, lacks {codepoints}."
+        )
     sys.exit(
-        "Sarasa Gothic SC (更纱黑体) is required for montage labels; "
-        "install SarasaGothicSC-Regular.ttf"
+        "No declared montage label font is available. Install Sarasa Gothic "
+        "SC or another family from the documented fallback stack."
     )
 
 
@@ -56,7 +96,8 @@ def build_montage(paths, out, cols=0, pad=16, bg=(255, 255, 255), label=False):
     H = rows * (cell_h + lab_h) + (rows + 1) * pad
     sheet = Image.new("RGB", (W, H), bg)
     draw = ImageDraw.Draw(sheet)
-    font = load_label_font(14) if label else None
+    label_text = "\n".join(os.path.basename(path) for path in paths)
+    font = load_label_font(14, label_text) if label else None
 
     for i, (im, p) in enumerate(zip(imgs, paths)):
         r, c = divmod(i, cols)

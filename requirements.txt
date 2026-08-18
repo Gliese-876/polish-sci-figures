@@ -3,4 +3,5 @@ numpy
 openpyxl
 pandas
 Pillow
+PyMuPDF
 scipy

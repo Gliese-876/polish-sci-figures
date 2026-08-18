@@ -40,12 +40,14 @@ Read `references/integrity_and_layout.md` before processing fluorescence composi
 - Use one physical SVG panel size per slot class and verify effective raster dpi at that final size.
 - Use the same scale-bar length and placement within a comparable batch when it fits the shared field of view.
 - Center the scale-bar label over the bar; do not right-align it to the bar endpoint. Keep this alignment and type size identical across the batch.
+- Use Sarasa Gothic SC first for default SC glyph forms in raster labels and editable SVG overlays; if it is unavailable or lacks a required character, select and record the first declared fallback that covers the complete label. Fail instead of drawing tofu when no declared family covers it.
 - Keep scale bars inside a safety margin and choose black or white from the local background for contrast.
 - Do not add panel letters, serial numbers, per-image titles, or conclusions by default. Add only explicitly requested sample labels that are necessary to interpret the image.
 - Keep captions, acquisition settings, and interpretation outside the image montage.
 - Do not stretch images to make them fit. Crop consistently and record the crop box.
 - Keep scale bars and their labels editable in the SVG delivery layer. Treat the underlying scientific image as faithful raster content, not as a fully vector-editable object.
 - Judge scale-bar and sample-label size in the final panel or montage, not while zoomed into the source. Use one readable label hierarchy and baseline within each slot class.
+- Keep every rendered scale-bar or sample-label glyph at least 5 pt at the declared final panel size.
 
 ## Finish with the polish skill
 
@@ -55,4 +57,4 @@ Read `references/professional_basis.md` for the image-integrity, publication-lay
 
 ## Acceptance gate
 
-Do not deliver if any raw file was changed, calibration is absent or guessed, comparison-batch display settings differ, crops remove different scientific regions without justification, outputs differ in size, a scale bar is clipped, incorrect, or too small at final size, or unrequested labels/titles/serial numbers appear.
+Do not deliver if any raw file was changed, calibration is absent or guessed, comparison-batch display settings differ, crops remove different scientific regions without justification, outputs differ in size, a scale bar is clipped, incorrect, or too small at final size, any rendered label glyph is below 5 pt at final size, or unrequested labels/titles/serial numbers appear.

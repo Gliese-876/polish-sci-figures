@@ -1,0 +1,25 @@
+{
+  "name": "polish-sci-figures",
+  "version": "1.2.1+codex.20260818153451",
+  "description": "Create, standardize, polish, and audit publication-grade scientific figures.",
+  "author": {
+    "name": "zhoy0409-debug"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "SCI Figure Skills",
+    "shortDescription": "Publication-grade scientific figure workflows",
+    "longDescription": "Three coordinated skills for defensible data visualization, auditable scientific image standardization, and final publication-grade figure polishing and QA.",
+    "developerName": "zhoy0409-debug",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Profile my data and generate defensible figure candidates.",
+      "Standardize this scientific image batch with an audit trail.",
+      "Polish and audit these figures for publication."
+    ]
+  }
+}

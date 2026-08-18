@@ -35,6 +35,7 @@ from figure_workbench import (
     mean_ci,
     read_table,
     resolve_font,
+    resolve_font_faces,
     resolve_palette,
     save_figure,
     style,
@@ -60,19 +61,35 @@ def _numeric(series: pd.Series, name: str) -> pd.Series:
 
 
 def _font_profile(requested: str) -> tuple[str, dict]:
-    actual, path = resolve_font(requested)
+    declared_stack, actual, path = resolve_font(requested)
+    faces, reused_regular_roles = resolve_font_faces(actual)
     payload = {
         "requested": requested,
         "actual": actual,
         "file": Path(path).name if path else None,
+        "faces": {role: Path(face).name for role, face in faces.items()},
+        "roles_reusing_regular": reused_regular_roles,
+        "fallback_stack": list(declared_stack),
+        "fallback_used": actual != requested,
         "warning": None,
     }
     if actual != requested:
         payload["warning"] = (
-            f"Requested font '{requested}' was unavailable; rendered with '{actual}'. "
-            "Regenerate where the target font is installed before submission."
+            f"Requested font '{requested}' was unavailable; rendered with the "
+            f"declared fallback '{actual}'. Regenerate with the requested family "
+            "only if the destination requires that exact font."
         )
-    style(actual)
+    if reused_regular_roles:
+        face_warning = (
+            f"Font '{actual}' reuses its regular file for "
+            f"{', '.join(reused_regular_roles)}; verify that the destination "
+            "permits synthetic faces."
+        )
+        payload["warning"] = (
+            f"{payload['warning']} {face_warning}"
+            if payload["warning"] else face_warning
+        )
+    style(declared_stack, actual)
     return actual, payload
 
 

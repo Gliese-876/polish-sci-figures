@@ -17,6 +17,25 @@ import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
 
 LOCKED_COLUMNS = ["um_per_pixel", "display_min", "display_max", "gamma", "lut", "scale_bar_um"]
+FONT_FILE_CANDIDATES = (
+    ("Sarasa Gothic SC", "C:/Windows/Fonts/SarasaGothicSC-Regular.ttf", 0),
+    ("Sarasa Gothic SC", "/Library/Fonts/SarasaGothicSC-Regular.ttf", 0),
+    ("Sarasa Gothic SC", "/usr/share/fonts/truetype/sarasa-gothic/SarasaGothicSC-Regular.ttf", 0),
+    ("Sarasa Gothic SC", "/usr/local/share/fonts/SarasaGothicSC-Regular.ttf", 0),
+    ("Noto Sans CJK SC", "C:/Windows/Fonts/NotoSansCJKsc-Regular.otf", 0),
+    ("Noto Sans CJK SC", "/Library/Fonts/NotoSansCJKsc-Regular.otf", 0),
+    ("Noto Sans CJK SC", "/usr/share/fonts/opentype/noto/NotoSansCJKsc-Regular.otf", 0),
+    ("Noto Sans CJK SC", "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", 2),
+    ("Microsoft YaHei", "C:/Windows/Fonts/msyh.ttc", 0),
+    ("PingFang SC", "/System/Library/Fonts/PingFang.ttc", 0),
+    ("DejaVu Sans", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 0),
+    ("DejaVu Sans", "DejaVuSans.ttf", 0),
+)
+FONT_FAMILY_STACK = tuple(dict.fromkeys(
+    family for family, _candidate, _index in FONT_FILE_CANDIDATES
+))
+SVG_FONT_FAMILY = ", ".join((*FONT_FAMILY_STACK, "sans-serif"))
+MIN_RENDERED_FONT_PT = 5.0
 
 
 def sha256(path: Path) -> str:
@@ -144,19 +163,44 @@ def apply_display(image: Image.Image, display_min, display_max, gamma: float, lu
     return Image.fromarray(rgb, "RGB")
 
 
-def find_font(size: int) -> tuple[ImageFont.ImageFont, str]:
-    candidates = [
-        Path("C:/Windows/Fonts/SarasaGothicSC-Regular.ttf"),
-        Path("/Library/Fonts/SarasaGothicSC-Regular.ttf"),
-        Path("/usr/share/fonts/truetype/sarasa-gothic/SarasaGothicSC-Regular.ttf"),
-        Path("/usr/local/share/fonts/SarasaGothicSC-Regular.ttf"),
-    ]
-    for path in candidates:
-        if path.is_file():
-            return ImageFont.truetype(str(path), size=size), str(path)
+def _glyph_signature(font: ImageFont.ImageFont, character: str) -> tuple:
+    mask = font.getmask(character, mode="L")
+    return mask.size, mask.getbbox(), bytes(mask)
+
+
+def _missing_codepoints(font: ImageFont.ImageFont, text: str) -> tuple[int, ...]:
+    """Return code points that FreeType maps to its visible .notdef glyph."""
+    missing_signature = _glyph_signature(font, "\U0010ffff")
+    return tuple(sorted({
+        ord(character)
+        for character in text
+        if not character.isspace()
+        and _glyph_signature(font, character) == missing_signature
+    }))
+
+
+def find_font(size: int, required_text: str = "") -> tuple[ImageFont.ImageFont, str, str]:
+    incomplete: list[tuple[str, tuple[int, ...]]] = []
+    for family, candidate, index in FONT_FILE_CANDIDATES:
+        try:
+            font = ImageFont.truetype(candidate, size=size, index=index)
+        except OSError:
+            continue
+        missing = _missing_codepoints(font, required_text) if required_text else ()
+        if missing:
+            incomplete.append((family, missing))
+            continue
+        return font, candidate, family
+    if incomplete:
+        family, missing = incomplete[0]
+        codepoints = ", ".join(f"U+{value:04X}" for value in missing[:12])
+        raise FileNotFoundError(
+            "No declared image-label font covers every required glyph. "
+            f"The first installed candidate, {family!r}, lacks {codepoints}."
+        )
     raise FileNotFoundError(
-        "Sarasa Gothic SC (更纱黑体) is required for image labels and scale bars. "
-        "Install SarasaGothicSC-Regular.ttf; silent fallback is not permitted."
+        "No declared image-label font is available. Install Sarasa Gothic SC "
+        "or another family from the documented fallback stack."
     )
 
 
@@ -166,7 +210,8 @@ def contrast_color(image: Image.Image, box: tuple[int, int, int, int]) -> str:
 
 
 def draw_scale_bar(image: Image.Image, um_per_pixel: float, bar_um: float,
-                   label_bar: bool = True) -> tuple[Image.Image, dict]:
+                   label_bar: bool = True,
+                   *, min_font_pixels: int = 0) -> tuple[Image.Image, dict]:
     out = image.copy().convert("RGB")
     length_px = int(round(bar_um / um_per_pixel))
     margin = max(12, int(round(min(out.size) * 0.035)))
@@ -179,20 +224,41 @@ def draw_scale_bar(image: Image.Image, um_per_pixel: float, bar_um: float,
     x0 = x1 - length_px
     y1 = out.height - margin
     y0 = y1 - thickness
-    sample_box = (max(0, x0 - 6), max(0, y0 - 28), min(out.width, x1 + 6), min(out.height, y1 + 6))
-    color = contrast_color(out, sample_box)
-    draw = ImageDraw.Draw(out)
-    draw.rectangle((x0, y0, x1, y1), fill=color)
-    font_size = max(18, int(round(out.height * 0.070)))
-    font, font_path = find_font(font_size)
+    font_size = max(
+        18, int(round(out.height * 0.070)),
+        min_font_pixels,
+    )
     label = f"{bar_um:g} µm"
     label_box = None
+    font_path = None
+    font_family = None
+    draw = ImageDraw.Draw(out)
     if label_bar:
+        font, font_path, font_family = find_font(font_size, label)
         bounds = draw.textbbox((0, 0), label, font=font)
         text_w = bounds[2] - bounds[0]
         text_h = bounds[3] - bounds[1]
         tx = (x0 + x1 - text_w) / 2
+        if tx + bounds[2] > out.width:
+            shift = int(math.ceil(tx + bounds[2] - out.width))
+            x0 -= shift
+            x1 -= shift
+            tx = (x0 + x1 - text_w) / 2
+        if tx + bounds[0] < 0:
+            shift = int(math.ceil(-(tx + bounds[0])))
+            x0 += shift
+            x1 += shift
+        if x0 < margin or x1 > out.width - margin:
+            raise ValueError("The scale-bar label cannot fit at the 5 pt floor.")
+    sample_box = (max(0, x0 - 6), max(0, y0 - 28), min(out.width, x1 + 6), min(out.height, y1 + 6))
+    color = contrast_color(out, sample_box)
+    draw.rectangle((x0, y0, x1, y1), fill=color)
+    if label_bar:
+        tx = (x0 + x1 - text_w) / 2
         ty = max(margin, y0 - text_h - 7)
+        if (tx + bounds[0] < 0 or tx + bounds[2] > out.width
+                or ty + bounds[3] > y0):
+            raise ValueError("The scale-bar label cannot fit at the 5 pt floor.")
         draw.text((tx, ty), label, font=font, fill=color)
         label_box = [tx, ty, tx + text_w, ty + text_h]
     return out, {
@@ -201,27 +267,43 @@ def draw_scale_bar(image: Image.Image, um_per_pixel: float, bar_um: float,
         "scale_bar_label": label if label_bar else None,
         "scale_bar_label_box": label_box, "font_size_pixels": font_size,
         "scale_bar_label_alignment": "centered_over_scale_bar",
-        "font_file": Path(font_path).name if Path(font_path).suffix else font_path,
+        "font_file": (Path(font_path).name if Path(font_path).suffix else font_path)
+        if font_path else None,
+        "font_family": font_family,
+        "font_fallback_used": bool(
+            font_family and font_family != FONT_FAMILY_STACK[0]
+        ) if label_bar else None,
+        "font_fallback_stack": list(FONT_FAMILY_STACK) if label_bar else None,
     }
 
 
-def draw_optional_label(image: Image.Image, text: str) -> tuple[Image.Image, dict | None]:
+def draw_optional_label(image: Image.Image, text: str, *,
+                        min_font_pixels: int = 0) -> tuple[Image.Image, dict | None]:
     text = str(clean_scalar(text, "")).strip()
     if not text:
         return image, None
     out = image.copy()
     draw = ImageDraw.Draw(out)
-    font_size = max(14, int(round(out.height * 0.050)))
-    font, font_path = find_font(font_size)
+    font_size = max(
+        14, int(round(out.height * 0.050)),
+        min_font_pixels,
+    )
+    font, font_path, font_family = find_font(font_size, text)
     margin = max(12, int(round(min(out.size) * 0.035)))
     bounds = draw.textbbox((0, 0), text, font=font)
     w, h = bounds[2] - bounds[0], bounds[3] - bounds[1]
+    if (margin + bounds[0] < 0 or margin + bounds[2] > out.width
+            or margin + bounds[3] > out.height):
+        raise ValueError("The sample label cannot fit at the 5 pt floor.")
     sample = (margin - 4, margin - 4, min(out.width, margin + w + 4), min(out.height, margin + h + 4))
     color = contrast_color(out, sample)
     draw.text((margin, margin), text, font=font, fill=color)
     return out, {"label": text, "label_box": [margin, margin, margin + w, margin + h],
                  "label_color": color, "font_size_pixels": font_size,
-                 "font_file": Path(font_path).name if Path(font_path).suffix else font_path}
+                 "font_file": Path(font_path).name if Path(font_path).suffix else font_path,
+                 "font_family": font_family,
+                 "font_fallback_used": font_family != FONT_FAMILY_STACK[0],
+                 "font_fallback_stack": list(FONT_FAMILY_STACK)}
 
 
 def write_editable_panel_svg(display_image: Image.Image, output: Path,
@@ -240,7 +322,7 @@ def write_editable_panel_svg(display_image: Image.Image, output: Path,
         f'<image id="display-raster" x="0" y="0" width="{width}" height="{height}" '
         f'href="data:image/png;base64,{encoded}"/>',
         '</g>',
-        '<g id="editable-overlays" font-family="Sarasa Gothic SC">',
+        f'<g id="editable-overlays" font-family="{SVG_FONT_FAMILY}">',
     ]
     if scale_bar:
         x0, y0, x1, y1 = scale_bar["scale_bar_box"]
@@ -303,6 +385,7 @@ def standardize(manifest: Path, outdir: Path, target_width: int | None = None,
             f"The requested {physical_width_mm:g} mm panel would provide only {effective_dpi:.1f} dpi. "
             "Use a smaller final panel or a higher-resolution source; pixels will not be invented."
         )
+    min_font_pixels = math.ceil(MIN_RENDERED_FONT_PT * effective_dpi / 72)
     physical_height_mm = physical_width_mm * height / width
     outdir.mkdir(parents=True, exist_ok=True)
     records = []
@@ -318,9 +401,21 @@ def standardize(manifest: Path, outdir: Path, target_width: int | None = None,
         bar_value = clean_scalar(row.get("scale_bar_um"), scale_bar_um)
         bar_audit = None
         if bar_value is not None:
-            preview, bar_audit = draw_scale_bar(preview, float(row["um_per_pixel"]),
-                                                float(bar_value), label_scale_bar)
-        preview, label_audit = draw_optional_label(preview, row.get("label", ""))
+            preview, bar_audit = draw_scale_bar(
+                preview, float(row["um_per_pixel"]), float(bar_value),
+                label_scale_bar, min_font_pixels=min_font_pixels,
+            )
+            if bar_audit["scale_bar_label"]:
+                bar_audit["font_size_pt_at_panel_size"] = (
+                    bar_audit["font_size_pixels"] * 72 / effective_dpi
+                )
+        preview, label_audit = draw_optional_label(
+            preview, row.get("label", ""), min_font_pixels=min_font_pixels,
+        )
+        if label_audit:
+            label_audit["font_size_pt_at_panel_size"] = (
+                label_audit["font_size_pixels"] * 72 / effective_dpi
+            )
         stem = str(row["output_name"])
         display_png = outdir / f"{stem}_display.png"
         preview_output = outdir / f"{stem}_preview.png"
@@ -345,6 +440,7 @@ def standardize(manifest: Path, outdir: Path, target_width: int | None = None,
             "output_width": width, "output_height": height,
             "panel_width_mm": physical_width_mm, "panel_height_mm": physical_height_mm,
             "effective_raster_dpi_at_panel_size": effective_dpi,
+            "minimum_rendered_font_size_pt": MIN_RENDERED_FONT_PT,
             "crop_box_source_pixels": list(crop_box), "batch": str(row.get("batch", "batch_1")),
             "um_per_pixel": clean_scalar(row.get("um_per_pixel")),
             "display_min": float(clean_scalar(row.get("display_min"), 0.0)),

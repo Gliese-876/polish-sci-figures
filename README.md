@@ -60,7 +60,7 @@ Conserved cell-state flows, directional ligand–receptor interactions, RNA–AT
 | 2. Images | `standardize-sci-images` | Equal-size scientific images, calibrated scale bars, montage, and SHA-256 processing audit |
 | 3. Finish | `polish-sci-figures` | Fixed-canvas SVG/PDF/PNG, final typography, assembly, editability checks, and container QA |
 
-All three stages use Arial by default, allow one-place journal-font replacement, keep SVG text live, and reject unintended overlap.
+All three stages prefer Sarasa Gothic SC, use the declared five-family fallback stack, keep SVG text live, and reject unintended overlap.
 
 ## 124-template scientific atlas
 
@@ -130,7 +130,7 @@ Exploratory and confirmatory scopes remain separate. Adjusted survival, generali
 
 ## Install
 
-Download the [latest release](https://github.com/zhoy0409-debug/polish-sci-figures/releases/latest) or clone the repository, then install the dependencies and copy the three skill folders.
+Download the [latest release](https://github.com/zhoy0409-debug/polish-sci-figures/releases/latest) or clone the repository, then install the dependencies and copy the three skill folders. The repository root is also a Codex plugin bundle through `.codex-plugin/plugin.json`.
 
 ### Windows PowerShell
 
@@ -190,11 +190,13 @@ Each generated data-figure bundle contains fixed-canvas PNG/SVG/PDF candidates, 
 - No text–text, text–data, legend, scale-bar, axis, or annotation collisions at final size.
 - Equal physical canvas and axes geometry for panels intended for the same slot.
 - Correct case, italics, units, symbols, subscripts, superscripts, and journal font.
+- Parent and ordinary text renders at 5 pt or larger at final size; reduced mathematical scripts below 5 pt warn unless the target requires a strict glyph floor.
 - Editable SVG/PDF plus high-resolution PNG; raster content is never mislabeled fully editable.
 
 ## Repository layout
 
 ```text
+.codex-plugin/plugin.json       Codex plugin manifest for the three skills
 skills/make-sci-data-figures/   raw data, statistics, candidate charts, palette recipes
 skills/standardize-sci-images/  calibrated image standardization and processing audit
 skills/polish-sci-figures/      final drawing, assembly, export, and QA
